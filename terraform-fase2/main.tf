@@ -61,12 +61,12 @@ resource "aws_glue_catalog_table" "bovespa_table" {
       type = "string"
     }
     columns {
-      name = "Qtde. Teórica"
-      type = "string"
+      name = "Qtde_Teorica"
+      type = "double"  # Atualizado
     }
     columns {
-      name = "Part. (%)"
-      type = "string"
+      name = "Part_Perc"
+      type = "double"  # Atualizado
     }
   }
 }
@@ -241,11 +241,11 @@ resource "aws_glue_catalog_table" "bovespa_output_table" {
     }
     columns {
       name = "Qtde_Teorica"
-      type = "string"
+      type = "double"  # Atualizado
     }
     columns {
       name = "Part_Pct"
-      type = "string"
+      type = "double"  # Atualizado
     }
     columns {
       name = "date_diff"

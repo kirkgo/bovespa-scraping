@@ -57,7 +57,7 @@ try:
     # Conversão de volta para DynamicFrame
     dynamic_frame = DynamicFrame.fromDF(df_grouped, glueContext, "dynamic_frame")
 
-    # Gravar de volta para S3 no formato Parquet, particionado
+    # Gravar de volta para S3 no formato Parquet, particionado por data e nome da ação
     logger.info("Gravando os dados no S3 em formato Parquet")
     sink = glueContext.getSink(
         connection_type="s3", 
