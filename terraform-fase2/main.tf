@@ -68,6 +68,10 @@ resource "aws_glue_catalog_table" "bovespa_table" {
       name = "Part_Perc"
       type = "double"  # Atualizado
     }
+    columns {
+      name = "DataPregao"
+      type = "string"  # Supondo que existe essa coluna para cálculo da data
+    }
   }
 }
 
@@ -228,12 +232,12 @@ resource "aws_glue_catalog_table" "bovespa_output_table" {
     }
 
     columns {
-      name = "Codigo"
-      type = "string"
+      name = "CodigoRenomeado"
+      type = "string"  # Atualizado
     }
     columns {
-      name = "Acao"
-      type = "string"
+      name = "AcaoRenomeada"
+      type = "string"  # Atualizado
     }
     columns {
       name = "Tipo"

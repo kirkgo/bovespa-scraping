@@ -21,10 +21,10 @@ job.init(args['JOB_NAME'], args)
 
 try:
     # Carregar dados de uma tabela Glue
-    logger.info("Carregando dados da tabela Glue 'bovespa_table'")
+    logger.info("Carregando dados da tabela Glue 'bovespa_input_table'")
     datasource = glueContext.create_dynamic_frame.from_catalog(
         database="bovespa_db", 
-        table_name="bovespa_table", 
+        table_name="bovespa_input_table", 
         transformation_ctx="datasource"
     )
 
@@ -33,8 +33,8 @@ try:
     applymapping = ApplyMapping.apply(
         frame=datasource, 
         mappings=[
-            ("Código", "string", "CodigoRenomeado", "string"), 
-            ("Ação", "string", "AcaoRenomeada", "string"), 
+            ("Codigo", "string", "CodigoRenomeado", "string"), 
+            ("Acao", "string", "AcaoRenomeada", "string"), 
             ("Tipo", "string", "Tipo", "string"),
             ("Qtde_Teorica", "double", "Qtde_Teorica", "double"),  # Atualizado para double
             ("Part_Perc", "double", "Part_Pct", "double")  # Atualizado para double
@@ -55,8 +55,8 @@ try:
     df_grouped = df_grouped.withColumn("symbol", col("CodigoRenomeado"))
 
     # Exemplo de cálculo de data: diferença entre datas
-    # Supondo que exista uma coluna chamada "DataPregao" para cálculo da diferença de datas
-    df_grouped = df_grouped.withColumn("date_diff", datediff(current_date(), col("DataPregao")))
+    # Supondo que exista uma coluna chamada SomeDateColumn
+    df_grouped = df_grouped.withColumn("date_diff", datediff(current_date(), col("SomeDateColumn")))
 
     # Conversão de volta para DynamicFrame
     dynamic_frame = DynamicFrame.fromDF(df_grouped, glueContext, "dynamic_frame")

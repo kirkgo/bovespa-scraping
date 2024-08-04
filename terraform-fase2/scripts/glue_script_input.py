@@ -4,7 +4,6 @@ from awsglue.utils import getResolvedOptions
 from pyspark.context import SparkContext
 from awsglue.context import GlueContext
 from awsglue.job import Job
-from pyspark.sql.functions import col, datediff, current_date, date_format
 import logging
 
 # Configuração do log
@@ -33,11 +32,11 @@ try:
     applymapping = ApplyMapping.apply(
         frame=datasource, 
         mappings=[
-            ("Código", "string", "CodigoRenomeado", "string"), 
-            ("Ação", "string", "AcaoRenomeada", "string"), 
+            ("Código", "string", "Codigo", "string"), 
+            ("Ação", "string", "Acao", "string"), 
             ("Tipo", "string", "Tipo", "string"),
             ("Qtde_Teorica", "double", "Qtde_Teorica", "double"),  # Atualizado para double
-            ("Part_Perc", "double", "Part_Pct", "double")  # Atualizado para double
+            ("Part_Perc", "double", "Part_Perc", "double")  # Atualizado para double
         ], 
         transformation_ctx="applymapping"
     )
@@ -45,36 +44,21 @@ try:
     # Conversão para DataFrame do Spark
     df = applymapping.toDF()
 
-    # Agrupamento e sumarização dos dados
-    logger.info("Agrupando e sumarizando os dados")
-    df_grouped = df.groupBy("CodigoRenomeado").agg({'Qtde_Teorica': 'sum'})
-
-    # Adicionar colunas de partição e cálculo de data
-    logger.info("Adicionando colunas de partição e cálculo de data")
-    df_grouped = df_grouped.withColumn("date_partition", date_format(current_date(), "yyyy-MM-dd"))
-    df_grouped = df_grouped.withColumn("symbol", col("CodigoRenomeado"))
-
-    # Exemplo de cálculo de data: diferença entre datas
-    # Supondo que exista uma coluna chamada "DataPregao" para cálculo da diferença de datas
-    df_grouped = df_grouped.withColumn("date_diff", datediff(current_date(), col("DataPregao")))
-
-    # Conversão de volta para DynamicFrame
-    dynamic_frame = DynamicFrame.fromDF(df_grouped, glueContext, "dynamic_frame")
-
-    # Gravar de volta para S3 no formato Parquet, particionado por data e nome da ação
+    # Gravar de volta para S3 no formato Parquet, particionado por data
     logger.info("Gravando os dados no S3 em formato Parquet")
+    dynamic_frame = DynamicFrame.fromDF(df, glueContext, "dynamic_frame")
     sink = glueContext.getSink(
         connection_type="s3", 
-        path="s3://my-bovespa-bucket/refined/", 
+        path="s3://my-bovespa-bucket/raw/", 
         transformation_ctx="sink"
     )
     sink.setFormat("parquet")
     sink.setCatalogInfo(
         catalogDatabase="bovespa_db", 
-        catalogTableName="bovespa_output_table"
+        catalogTableName="bovespa_input_table"
     )
     sink.setFormatOptions(
-        format_options={"partitionKeys": ["date_partition", "symbol"]}
+        format_options={"partitionKeys": ["Codigo"]}
     )
     sink.writeFrame(dynamic_frame)
 
