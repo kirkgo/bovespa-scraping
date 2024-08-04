@@ -36,8 +36,8 @@ try:
             ("Código", "string", "Codigo", "string"), 
             ("Ação", "string", "Acao", "string"), 
             ("Tipo", "string", "Tipo", "string"),
-            ("Qtde. Teórica", "string", "Qtde_Teorica", "string"),
-            ("Part. (%)", "string", "Part_Pct", "string")
+            ("Qtde_Teorica", "string", "Qtde_Teorica", "string"),  # Atualizado
+            ("Part_Perc", "string", "Part_Pct", "string")  # Atualizado
         ], 
         transformation_ctx="applymapping"
     )
