@@ -62,15 +62,15 @@ resource "aws_glue_catalog_table" "bovespa_table" {
     }
     columns {
       name = "Qtde_Teorica"
-      type = "double"  # Atualizado
+      type = "double"
     }
     columns {
       name = "Part_Perc"
-      type = "double"  # Atualizado
+      type = "double"
     }
     columns {
       name = "DataPregao"
-      type = "string"  # Supondo que existe essa coluna para cálculo da data
+      type = "string"
     }
   }
 }
@@ -233,11 +233,11 @@ resource "aws_glue_catalog_table" "bovespa_output_table" {
 
     columns {
       name = "CodigoRenomeado"
-      type = "string"  # Atualizado
+      type = "string"
     }
     columns {
       name = "AcaoRenomeada"
-      type = "string"  # Atualizado
+      type = "string"
     }
     columns {
       name = "Tipo"
@@ -245,11 +245,11 @@ resource "aws_glue_catalog_table" "bovespa_output_table" {
     }
     columns {
       name = "Qtde_Teorica"
-      type = "double"  # Atualizado
+      type = "double"
     }
     columns {
       name = "Part_Pct"
-      type = "double"  # Atualizado
+      type = "double"
     }
     columns {
       name = "date_diff"
