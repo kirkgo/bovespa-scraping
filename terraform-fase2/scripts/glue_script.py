@@ -24,7 +24,7 @@ try:
     logger.info("Carregando dados da tabela Glue 'bovespa_table'")
     datasource = glueContext.create_dynamic_frame.from_catalog(
         database="bovespa_db", 
-        table_name="bovespa_table", 
+        table_name="bovespa_input_table", 
         transformation_ctx="datasource"
     )
 
@@ -33,11 +33,11 @@ try:
     applymapping = ApplyMapping.apply(
         frame=datasource, 
         mappings=[
-            ("Código", "string", "CodigoRenomeado", "string"), 
-            ("Ação", "string", "AcaoRenomeada", "string"), 
+            ("Código", "string", "Codigo", "string"), 
+            ("Ação", "string", "Acao", "string"), 
             ("Tipo", "string", "Tipo", "string"),
-            ("Qtde_Teorica", "double", "Qtde_Teorica", "double"),  # Atualizado para double
-            ("Part_Perc", "double", "Part_Pct", "double")  # Atualizado para double
+            ("Qtde_Teorica", "string", "Qtde_Teorica", "double"),  # Atualizado para double
+            ("Part_Perc", "string", "Part_Pct", "double")  # Atualizado para double
         ], 
         transformation_ctx="applymapping"
     )
@@ -47,7 +47,12 @@ try:
 
     # Agrupamento e sumarização dos dados
     logger.info("Agrupando e sumarizando os dados")
-    df_grouped = df.groupBy("CodigoRenomeado").agg({'Qtde_Teorica': 'sum'})
+    df_grouped = df.groupBy("Codigo").agg({'Qtde_Teorica': 'sum'})
+
+    # Renomear colunas
+    logger.info("Renomeando colunas")
+    df_grouped = df_grouped.withColumnRenamed("Codigo", "CodigoRenomeado")
+    df_grouped = df_grouped.withColumnRenamed("Acao", "AcaoRenomeada")
 
     # Adicionar colunas de partição e cálculo de data
     logger.info("Adicionando colunas de partição e cálculo de data")
@@ -55,8 +60,7 @@ try:
     df_grouped = df_grouped.withColumn("symbol", col("CodigoRenomeado"))
 
     # Exemplo de cálculo de data: diferença entre datas
-    # Supondo que exista uma coluna chamada "DataPregao" para cálculo da diferença de datas
-    df_grouped = df_grouped.withColumn("date_diff", datediff(current_date(), col("DataPregao")))
+    df_grouped = df_grouped.withColumn("date_diff", datediff(current_date(), col("SomeDateColumn")))
 
     # Conversão de volta para DynamicFrame
     dynamic_frame = DynamicFrame.fromDF(df_grouped, glueContext, "dynamic_frame")

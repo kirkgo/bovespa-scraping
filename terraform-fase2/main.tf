@@ -62,16 +62,46 @@ resource "aws_glue_catalog_table" "bovespa_table" {
     }
     columns {
       name = "Qtde_Teorica"
-      type = "double"
+      type = "double"  # Atualizado
     }
     columns {
       name = "Part_Perc"
-      type = "double"
+      type = "double"  # Atualizado
     }
-    columns {
-      name = "DataPregao"
-      type = "string"
-    }
+  }
+}
+
+# Crawler para a Tabela de Input
+resource "aws_glue_crawler" "bovespa_input_crawler" {
+  name          = "bovespa-input-crawler"
+  role          = aws_iam_role.glue_exec_role.arn
+  database_name = aws_glue_catalog_database.bovespa_db.name
+  table_prefix  = "bovespa_input_"
+
+  s3_target {
+    path = "s3://${aws_s3_bucket.bovespa_bucket.bucket}/raw/"
+  }
+
+  schema_change_policy {
+    delete_behavior = "DEPRECATE_IN_DATABASE"
+    update_behavior = "UPDATE_IN_DATABASE"
+  }
+}
+
+# Crawler para a Tabela de Output
+resource "aws_glue_crawler" "bovespa_output_crawler" {
+  name          = "bovespa-output-crawler"
+  role          = aws_iam_role.glue_exec_role.arn
+  database_name = aws_glue_catalog_database.bovespa_db.name
+  table_prefix  = "bovespa_output_"
+
+  s3_target {
+    path = "s3://${aws_s3_bucket.bovespa_bucket.bucket}/refined/"
+  }
+
+  schema_change_policy {
+    delete_behavior = "DEPRECATE_IN_DATABASE"
+    update_behavior = "UPDATE_IN_DATABASE"
   }
 }
 
@@ -233,11 +263,11 @@ resource "aws_glue_catalog_table" "bovespa_output_table" {
 
     columns {
       name = "CodigoRenomeado"
-      type = "string"
+      type = "string"  # Atualizado
     }
     columns {
       name = "AcaoRenomeada"
-      type = "string"
+      type = "string"  # Atualizado
     }
     columns {
       name = "Tipo"
@@ -245,11 +275,11 @@ resource "aws_glue_catalog_table" "bovespa_output_table" {
     }
     columns {
       name = "Qtde_Teorica"
-      type = "double"
+      type = "double"  # Atualizado
     }
     columns {
       name = "Part_Pct"
-      type = "double"
+      type = "double"  # Atualizado
     }
     columns {
       name = "date_diff"
