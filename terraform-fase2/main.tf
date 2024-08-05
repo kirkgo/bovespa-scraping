@@ -1,6 +1,6 @@
 # Configurar o provedor AWS
 provider "aws" {
-  region = "us-east-1"
+  region = var.region
 }
 
 # Obter informações sobre a conta AWS atual
@@ -8,10 +8,10 @@ data "aws_caller_identity" "current" {}
 
 # Configurar o bucket S3
 resource "aws_s3_bucket" "bovespa_bucket" {
-  bucket = "bovespa-bucket"
+  bucket = var.bucket_name
 
   tags = {
-    Name        = "bovespa-bucket"
+    Name        = var.bucket_name
     Environment = "Dev"
   }
 }
@@ -56,6 +56,13 @@ resource "aws_s3_bucket_policy" "bovespa_bucket_policy" {
   })
 }
 
+# Upload do script de agregação para o bucket S3
+resource "aws_s3_object" "bovespa_aggregation_script" {
+  bucket = aws_s3_bucket.bovespa_bucket.bucket
+  key    = var.glue_script_s3_key
+  source = var.glue_script_path
+}
+
 # Notificação do bucket S3 para Lambda
 resource "aws_s3_bucket_notification" "bovespa_bucket_notification" {
   bucket = aws_s3_bucket.bovespa_bucket.id
@@ -80,15 +87,15 @@ resource "aws_lambda_permission" "allow_s3_invoke" {
 
 # Definição da função Lambda
 resource "aws_lambda_function" "trigger_glue_job" {
-  filename         = "lambda/lambda_function.zip"
+  filename         = var.lambda_function_zip_path
   function_name    = "trigger_glue_job"
   role             = aws_iam_role.lambda_execution_role.arn
   handler          = "lambda_function.lambda_handler"
-  source_code_hash = filebase64sha256("lambda/lambda_function.zip")
+  source_code_hash = filebase64sha256(var.lambda_function_zip_path)
   runtime          = "python3.8"
   environment {
     variables = {
-      GLUE_JOB_NAME = "nome_do_seu_glue_job"
+      GLUE_JOB_NAME = var.glue_job_name
     }
   }
 }
@@ -129,9 +136,86 @@ resource "aws_iam_role" "lambda_execution_role" {
           Effect = "Allow",
           Resource = "*",
         },
+        {
+          Action = [
+            "s3:GetObject",
+            "s3:ListBucket"
+          ],
+          Effect   = "Allow",
+          Resource = [
+            "arn:aws:s3:::${aws_s3_bucket.bovespa_bucket.bucket}",
+            "arn:aws:s3:::${aws_s3_bucket.bovespa_bucket.bucket}/*"
+          ]
+        }
       ],
     })
   }
+}
+
+# Role IAM para o Glue
+resource "aws_iam_role" "glue_role" {
+  name = "glue_role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Effect    = "Allow",
+        Principal = {
+          Service = "glue.amazonaws.com"
+        },
+        Action    = "sts:AssumeRole"
+      }
+    ]
+  })
+
+  inline_policy {
+    name   = "glue_policy"
+    policy = jsonencode({
+      Version = "2012-10-17",
+      Statement = [
+        {
+          Effect   = "Allow",
+          Action   = [
+            "s3:ListBucket",
+            "s3:PutObject",
+            "s3:GetObject"
+          ],
+          Resource = [
+            "arn:aws:s3:::${aws_s3_bucket.bovespa_bucket.bucket}",
+            "arn:aws:s3:::${aws_s3_bucket.bovespa_bucket.bucket}/*"
+          ]
+        },
+        {
+          Effect   = "Allow",
+          Action   = [
+            "logs:CreateLogGroup",
+            "logs:CreateLogStream",
+            "logs:PutLogEvents"
+          ],
+          Resource = "arn:aws:logs:*:*:*"
+        }
+      ]
+    })
+  }
+}
+
+# Glue job
+resource "aws_glue_job" "bovespa_job" {
+  name     = var.glue_job_name
+  role_arn = aws_iam_role.glue_role.arn
+  command {
+    name            = "glueetl"
+    script_location = "s3://${aws_s3_bucket.bovespa_bucket.bucket}/${var.glue_script_s3_key}"
+    python_version  = "3"
+  }
+  default_arguments = {
+    "--job-language" = "python"
+    "--TempDir"      = "s3://${aws_s3_bucket.bovespa_bucket.bucket}/temp/"
+    "--additional-python-modules" = "pandas,pyarrow"
+  }
+  max_capacity = 10
+  glue_version = "4.0"
 }
 
 
