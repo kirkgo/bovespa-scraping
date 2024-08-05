@@ -82,7 +82,7 @@ def main():
             os.makedirs(directory_name)
 
         pq.write_table(table, parquet_file_name)
-        logger.info(f"Arquivo Parquet salvo localmente como {parquet_file_name}")
+        logger.info(f"Arquivo Parquet salvo como {parquet_file_name}")
 
         s3 = boto3.client('s3')
         bucket_name = os.getenv('S3_BUCKET_NAME', 'bovespa-bucket')
