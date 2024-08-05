@@ -56,14 +56,14 @@ resource "aws_s3_bucket_policy" "bovespa_bucket_policy" {
   })
 }
 
-# Upload do script de agregação para o bucket S3
-resource "aws_s3_object" "bovespa_aggregation_script" {
+# Carregar o script para o S3
+resource "aws_s3_object" "glue_script" {
   bucket = aws_s3_bucket.bovespa_bucket.bucket
   key    = var.glue_script_s3_key
   source = var.glue_script_path
 }
 
-# Notificação do bucket S3 para Lambda
+# Definir a notificação do S3 para invocar a Lambda
 resource "aws_s3_bucket_notification" "bovespa_bucket_notification" {
   bucket = aws_s3_bucket.bovespa_bucket.id
 
@@ -146,6 +146,18 @@ resource "aws_iam_role" "lambda_execution_role" {
             "arn:aws:s3:::${aws_s3_bucket.bovespa_bucket.bucket}",
             "arn:aws:s3:::${aws_s3_bucket.bovespa_bucket.bucket}/*"
           ]
+        },
+        {
+          Action = [
+            "glue:GetTable",
+            "glue:CreateTable",
+            "glue:UpdateTable",
+            "glue:GetDatabase",
+            "glue:CreateDatabase",
+            "glue:UpdateDatabase"
+          ],
+          Effect   = "Allow",
+          Resource = "*"
         }
       ],
     })
@@ -194,6 +206,18 @@ resource "aws_iam_role" "glue_role" {
             "logs:PutLogEvents"
           ],
           Resource = "arn:aws:logs:*:*:*"
+        },
+        {
+          Effect   = "Allow",
+          Action   = [
+            "glue:GetTable",
+            "glue:CreateTable",
+            "glue:UpdateTable",
+            "glue:GetDatabase",
+            "glue:CreateDatabase",
+            "glue:UpdateDatabase"
+          ],
+          Resource = "*"
         }
       ]
     })
