@@ -2,6 +2,16 @@ provider "aws" {
   region = "us-east-1"
 }
 
+# Criar o bucket S3 para resultados do Athena
+resource "aws_s3_bucket" "athena_query_results_bucket" {
+  bucket = "my-bucket-athena-query-results"
+  acl    = "private"
+
+  versioning {
+    enabled = true
+  }
+}
+
 # Criar o bucket S3
 resource "aws_s3_bucket" "bovespa_bucket" {
   bucket = "my-bovespa-bucket"
@@ -37,7 +47,7 @@ resource "aws_glue_catalog_database" "bovespa_db" {
 # Tabela Glue para dados de entrada
 resource "aws_glue_catalog_table" "bovespa_table" {
   database_name = aws_glue_catalog_database.bovespa_db.name
-  name          = "bovespa_table"
+  name          = "bovespa_input_table"
   table_type    = "EXTERNAL_TABLE"
 
   storage_descriptor {
@@ -62,46 +72,12 @@ resource "aws_glue_catalog_table" "bovespa_table" {
     }
     columns {
       name = "Qtde_Teorica"
-      type = "double"  # Atualizado
+      type = "double"
     }
     columns {
       name = "Part_Perc"
-      type = "double"  # Atualizado
+      type = "double"
     }
-  }
-}
-
-# Crawler para a Tabela de Input
-resource "aws_glue_crawler" "bovespa_input_crawler" {
-  name          = "bovespa-input-crawler"
-  role          = aws_iam_role.glue_exec_role.arn
-  database_name = aws_glue_catalog_database.bovespa_db.name
-  table_prefix  = "bovespa_input_"
-
-  s3_target {
-    path = "s3://${aws_s3_bucket.bovespa_bucket.bucket}/raw/"
-  }
-
-  schema_change_policy {
-    delete_behavior = "DEPRECATE_IN_DATABASE"
-    update_behavior = "UPDATE_IN_DATABASE"
-  }
-}
-
-# Crawler para a Tabela de Output
-resource "aws_glue_crawler" "bovespa_output_crawler" {
-  name          = "bovespa-output-crawler"
-  role          = aws_iam_role.glue_exec_role.arn
-  database_name = aws_glue_catalog_database.bovespa_db.name
-  table_prefix  = "bovespa_output_"
-
-  s3_target {
-    path = "s3://${aws_s3_bucket.bovespa_bucket.bucket}/refined/"
-  }
-
-  schema_change_policy {
-    delete_behavior = "DEPRECATE_IN_DATABASE"
-    update_behavior = "UPDATE_IN_DATABASE"
   }
 }
 
@@ -146,9 +122,9 @@ resource "aws_iam_role" "lambda_exec_role" {
     Version = "2012-10-17",
     Statement = [
       {
-        Action = "sts:AssumeRole"
-        Effect = "Allow"
-        Sid    = ""
+        Action = "sts:AssumeRole",
+        Effect = "Allow",
+        Sid    = "",
         Principal = {
           Service = "lambda.amazonaws.com"
         }
@@ -208,9 +184,9 @@ resource "aws_iam_role" "glue_exec_role" {
     Version = "2012-10-17",
     Statement = [
       {
-        Action = "sts:AssumeRole"
-        Effect = "Allow"
-        Sid    = ""
+        Action = "sts:AssumeRole",
+        Effect = "Allow",
+        Sid    = "",
         Principal = {
           Service = "glue.amazonaws.com"
         }
@@ -219,7 +195,6 @@ resource "aws_iam_role" "glue_exec_role" {
   })
 }
 
-# Anexar política de execução para a role do Glue
 resource "aws_iam_role_policy_attachment" "glue_exec_attach" {
   role       = aws_iam_role.glue_exec_role.name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSGlueServiceRole"
@@ -236,15 +211,42 @@ resource "aws_iam_role_policy" "glue_s3_access" {
         Effect = "Allow",
         Action = [
           "s3:GetObject",
+          "s3:PutObject",
+          "s3:DeleteObject",
           "s3:ListBucket"
         ],
         Resource = [
-          "arn:aws:s3:::my-bovespa-bucket",
-          "arn:aws:s3:::my-bovespa-bucket/*"
+          "arn:aws:s3:::${aws_s3_bucket.bovespa_bucket.bucket}",
+          "arn:aws:s3:::${aws_s3_bucket.bovespa_bucket.bucket}/*"
         ]
+      },
+      {
+        Effect = "Allow",
+        Action = [
+          "glue:GetTable",
+          "glue:UpdateTable",
+          "glue:CreateTable",
+          "glue:DeleteTable",
+          "glue:GetPartitions",
+          "glue:GetDatabase",
+          "glue:CreateDatabase",
+          "glue:DeleteDatabase"
+        ],
+        Resource = "*"
       }
     ]
   })
+}
+
+# Adicionar CloudWatch Logs para monitoramento
+resource "aws_cloudwatch_log_group" "glue_log_group" {
+  name              = "/aws-glue/jobs/${aws_glue_job.bovespa_glue_job.name}"
+  retention_in_days = 14
+}
+
+resource "aws_iam_role_policy_attachment" "glue_cloudwatch_logs" {
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSGlueServiceNotebookRole"
+  role       = aws_iam_role.glue_exec_role.name
 }
 
 # Tabela Glue para dados de saída
@@ -263,27 +265,27 @@ resource "aws_glue_catalog_table" "bovespa_output_table" {
 
     columns {
       name = "CodigoRenomeado"
-      type = "string"  # Atualizado
-    }
-    columns {
-      name = "AcaoRenomeada"
-      type = "string"  # Atualizado
-    }
-    columns {
-      name = "Tipo"
       type = "string"
     }
     columns {
-      name = "Qtde_Teorica"
-      type = "double"  # Atualizado
+      name = "AcaoRenomeada"
+      type = "string"
     }
     columns {
-      name = "Part_Pct"
-      type = "double"  # Atualizado
+      name = "Qtde_Teorica_Total"
+      type = "double"
     }
     columns {
-      name = "date_diff"
-      type = "bigint"
+      name = "Part_Perc_Total"
+      type = "double"
+    }
+    columns {
+      name = "date_partition"
+      type = "string"
+    }
+    columns {
+      name = "symbol"
+      type = "string"
     }
   }
 
