@@ -85,16 +85,33 @@ def main():
         pq.write_table(table, parquet_buffer)
         parquet_buffer.seek(0)
 
+        # Verificar o conteúdo do arquivo Parquet
+        parquet_buffer.seek(0)  # Reposicionar o ponteiro para o início do buffer
+        table_read = pq.read_table(parquet_buffer)
+        df_read = table_read.to_pandas()
+        logger.info(f"Conteúdo do arquivo Parquet:\n{df_read}")
+
         # Nome do arquivo parquet com partição diária
         current_date = pd.to_datetime('now').strftime('%Y-%m-%d')
-        s3_key = f'raw/{current_date}/bovespa.parquet'
+        directory_name = f'raw/{current_date}'
+        parquet_file_name = f'raw/{current_date}/bovespa.parquet'
 
-        # Enviar para o S3 diretamente do buffer
+        # Criar o diretório se não existir
+        if not os.path.exists(directory_name):
+            os.makedirs(directory_name)
+
+        # Salvar o DataFrame no formato parquet localmente
+        table = pa.Table.from_pandas(df)
+        pq.write_table(table, parquet_file_name)
+        logger.info(f"Arquivo Parquet salvo localmente como {parquet_file_name}")
+
+        # Enviar para o S3
         s3 = boto3.client('s3')
         bucket_name = os.getenv('S3_BUCKET_NAME', 'my-bovespa-bucket')  # Use variável de ambiente para o bucket
+        s3.upload_file(parquet_file_name, bucket_name, f'raw/{current_date}/bovespa.parquet')
 
-        s3.upload_fileobj(parquet_buffer, bucket_name, s3_key)
-        logger.info(f"Arquivo {s3_key} enviado para o S3")
+
+        logger.info(f"Arquivo {parquet_file_name} enviado para o S3")
 
     except Exception as e:
         logger.error(f"Erro durante o scraping ou processamento dos dados: {e}", exc_info=True)
