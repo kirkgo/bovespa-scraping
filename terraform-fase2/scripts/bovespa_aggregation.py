@@ -50,7 +50,7 @@ else:
 
 # Definição do caminho S3 para o arquivo parquet
 input_path = f"s3://{bucket_name}/raw/{data_date}/bovespa.parquet"
-output_path = f"s3://{bucket_name}/processed/aggregated_bovespa.parquet"
+output_path = f"s3://{bucket_name}/refined/aggregated_bovespa.parquet"
 
 # Leitura do arquivo parquet
 df = spark.read.parquet(input_path)
