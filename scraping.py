@@ -79,6 +79,9 @@ def main():
         # Renomear colunas para remover caracteres especiais
         df.rename(columns={"Qtde. Teórica": "Qtde_Teorica", "Part. (%)": "Part_Perc"}, inplace=True)
 
+        # Resetar o índice do DataFrame
+        df.reset_index(drop=True, inplace=True)
+
         # Salvar o DataFrame no formato parquet
         table = pa.Table.from_pandas(df)
         parquet_buffer = io.BytesIO()
