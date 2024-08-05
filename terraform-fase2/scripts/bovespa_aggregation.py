@@ -5,8 +5,8 @@ from pyspark.context import SparkContext
 from awsglue.context import GlueContext
 from awsglue.job import Job
 import boto3
-import pandas as pd
-import pyarrow.parquet as pq
+import pyspark.sql.functions as F
+from pyspark.sql import SparkSession
 
 # Obter argumentos do job
 args = getResolvedOptions(sys.argv, ['JOB_NAME'])
@@ -55,14 +55,30 @@ output_path = f"s3://{bucket_name}/refined/aggregated_bovespa.parquet"
 # Leitura do arquivo parquet
 df = spark.read.parquet(input_path)
 
+# Renomear colunas existentes
+df = df.withColumnRenamed("Código", "Codigo") \
+       .withColumnRenamed("Ação", "Acao")
+
 # Realização da agregação (soma e sumarização)
-aggregated_df = df.groupBy("Código").agg(
+aggregated_df = df.groupBy("Codigo").agg(
     {"Qtde_Teorica": "sum", "Part_Perc": "sum"}
 )
 
-# Renomear colunas para refletir a agregação
+# Renomear colunas de agregação para refletir a agregação
 aggregated_df = aggregated_df.withColumnRenamed("sum(Qtde_Teorica)", "Total_Qtde_Teorica") \
                              .withColumnRenamed("sum(Part_Perc)", "Total_Part_Perc")
+
+# Adicionar colunas de data para cálculo de diferença de datas
+# Exemplo: Adicionando duas colunas de data fictícias para cálculo
+df = df.withColumn("Data_Inicial", F.lit("2024-01-01")) \
+       .withColumn("Data_Final", F.lit(data_date))
+
+# Convertendo colunas de data para tipo Date
+df = df.withColumn("Data_Inicial", F.to_date(df["Data_Inicial"], "yyyy-MM-dd")) \
+       .withColumn("Data_Final", F.to_date(df["Data_Final"], "yyyy-MM-dd"))
+
+# Calcular a diferença entre as datas
+df = df.withColumn("Diferenca_Dias", F.datediff(df["Data_Final"], df["Data_Inicial"]))
 
 # Gravação do resultado em um novo arquivo parquet
 aggregated_df.write.mode('overwrite').parquet(output_path)
