@@ -4,7 +4,7 @@ from awsglue.utils import getResolvedOptions
 from pyspark.context import SparkContext
 from awsglue.context import GlueContext
 from awsglue.job import Job
-from pyspark.sql.functions import col, datediff, current_date, date_format
+from pyspark.sql.functions import col, datediff, current_date, date_format, sum as _sum
 import logging
 
 # Configuração do log
@@ -21,46 +21,38 @@ job.init(args['JOB_NAME'], args)
 
 try:
     # Carregar dados de uma tabela Glue
-    logger.info("Carregando dados da tabela Glue 'bovespa_table'")
+    logger.info("Carregando dados da tabela Glue 'bovespa_input_table'")
     datasource = glueContext.create_dynamic_frame.from_catalog(
         database="bovespa_db", 
         table_name="bovespa_input_table", 
         transformation_ctx="datasource"
     )
 
-    # Renomear colunas com nomes da tabela
-    logger.info("Aplicando mapeamento nas colunas")
-    applymapping = ApplyMapping.apply(
-        frame=datasource, 
-        mappings=[
-            ("Código", "string", "Codigo", "string"), 
-            ("Ação", "string", "Acao", "string"), 
-            ("Tipo", "string", "Tipo", "string"),
-            ("Qtde_Teorica", "string", "Qtde_Teorica", "double"),  # Atualizado para double
-            ("Part_Perc", "string", "Part_Pct", "double")  # Atualizado para double
-        ], 
-        transformation_ctx="applymapping"
-    )
-
     # Conversão para DataFrame do Spark
-    df = applymapping.toDF()
+    df = datasource.toDF()
 
-    # Agrupamento e sumarização dos dados
-    logger.info("Agrupando e sumarizando os dados")
-    df_grouped = df.groupBy("Codigo").agg({'Qtde_Teorica': 'sum'})
+    # Verificação inicial do esquema
+    logger.info(f"Esquema inicial dos dados:\n{df.printSchema()}")
 
     # Renomear colunas
     logger.info("Renomeando colunas")
-    df_grouped = df_grouped.withColumnRenamed("Codigo", "CodigoRenomeado")
-    df_grouped = df_grouped.withColumnRenamed("Acao", "AcaoRenomeada")
+    df = df.withColumnRenamed("Código", "CodigoRenomeado") \
+           .withColumnRenamed("Ação", "AcaoRenomeada")
+
+    # Agrupamento e sumarização dos dados
+    logger.info("Agrupando e sumarizando os dados")
+    df_grouped = df.groupBy("CodigoRenomeado").agg(
+        _sum("Qtde_Teorica").alias("Qtde_Teorica_Total"),
+        _sum("Part_Perc").alias("Part_Perc_Total")
+    )
 
     # Adicionar colunas de partição e cálculo de data
     logger.info("Adicionando colunas de partição e cálculo de data")
     df_grouped = df_grouped.withColumn("date_partition", date_format(current_date(), "yyyy-MM-dd"))
     df_grouped = df_grouped.withColumn("symbol", col("CodigoRenomeado"))
 
-    # Exemplo de cálculo de data: diferença entre datas
-    df_grouped = df_grouped.withColumn("date_diff", datediff(current_date(), col("SomeDateColumn")))
+    # Verificação final do esquema
+    logger.info(f"Esquema final dos dados:\n{df_grouped.printSchema()}")
 
     # Conversão de volta para DynamicFrame
     dynamic_frame = DynamicFrame.fromDF(df_grouped, glueContext, "dynamic_frame")
