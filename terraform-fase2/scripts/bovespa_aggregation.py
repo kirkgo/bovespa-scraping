@@ -6,7 +6,6 @@ from awsglue.context import GlueContext
 from awsglue.job import Job
 import boto3
 import pyspark.sql.functions as F
-from pyspark.sql import SparkSession
 
 # Obter argumentos do job
 args = getResolvedOptions(sys.argv, ['JOB_NAME'])
@@ -50,7 +49,7 @@ else:
 
 # Definição do caminho S3 para o arquivo parquet
 input_path = f"s3://{bucket_name}/raw/{data_date}/bovespa.parquet"
-output_path = f"s3://{bucket_name}/refined/aggregated_bovespa.parquet"
+output_path = f"s3://{bucket_name}/refined/"
 
 # Leitura do arquivo parquet
 df = spark.read.parquet(input_path)
@@ -80,8 +79,10 @@ df = df.withColumn("Data_Inicial", F.to_date(df["Data_Inicial"], "yyyy-MM-dd")) 
 # Calcular a diferença entre as datas
 df = df.withColumn("Diferenca_Dias", F.datediff(df["Data_Final"], df["Data_Inicial"]))
 
-# Gravação do resultado em um novo arquivo parquet
-aggregated_df.write.mode('overwrite').parquet(output_path)
+# Gravação do resultado em um novo arquivo parquet particionado por data e ação
+aggregated_df = aggregated_df.withColumn("data", F.lit(data_date))
+
+aggregated_df.write.mode('overwrite').partitionBy("data", "Codigo").parquet(output_path)
 
 # Finalização do job
 job.commit()
