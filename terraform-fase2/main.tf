@@ -2,16 +2,6 @@ provider "aws" {
   region = "us-east-1"
 }
 
-# Criar o bucket S3 para resultados do Athena
-resource "aws_s3_bucket" "athena_query_results_bucket" {
-  bucket = "my-bucket-athena-query-results"
-  acl    = "private"
-
-  versioning {
-    enabled = true
-  }
-}
-
 # Criar o bucket S3
 resource "aws_s3_bucket" "bovespa_bucket" {
   bucket = "my-bovespa-bucket"
@@ -78,6 +68,56 @@ resource "aws_glue_catalog_table" "bovespa_table" {
       name = "Part_Perc"
       type = "double"
     }
+  }
+}
+
+# Tabela Glue para dados de saída
+resource "aws_glue_catalog_table" "bovespa_output_table" {
+  database_name = aws_glue_catalog_database.bovespa_db.name
+  name          = "bovespa_output_table"
+  table_type    = "EXTERNAL_TABLE"
+
+  storage_descriptor {
+    location      = "s3://${aws_s3_bucket.bovespa_bucket.bucket}/refined/"
+    input_format  = "org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat"
+    output_format = "org.apache.hadoop.hive.ql.io.parquet.MapredParquetOutputFormat"
+    ser_de_info {
+      serialization_library = "org.apache.hadoop.hive.ql.io.parquet.serde.ParquetHiveSerDe"
+    }
+
+    columns {
+      name = "CodigoRenomeado"
+      type = "string"
+    }
+    columns {
+      name = "AcaoRenomeada"
+      type = "string"
+    }
+    columns {
+      name = "Qtde_Teorica_Total"
+      type = "double"
+    }
+    columns {
+      name = "Part_Perc_Total"
+      type = "double"
+    }
+    columns {
+      name = "date_partition"
+      type = "string"
+    }
+    columns {
+      name = "symbol"
+      type = "string"
+    }
+  }
+
+  partition_keys {
+    name = "date_partition"
+    type = "string"
+  }
+  partition_keys {
+    name = "symbol"
+    type = "string"
   }
 }
 
@@ -155,7 +195,7 @@ resource "aws_lambda_permission" "allow_s3_to_call_lambda" {
   action        = "lambda:InvokeFunction"
   function_name = aws_lambda_function.trigger_glue_job.function_name
   principal     = "s3.amazonaws.com"
-  source_arn    = aws_s3_bucket.bovespa_bucket.arn
+  source_arn    = "arn:aws:s3:::${aws_s3_bucket.bovespa_bucket.bucket}"
 }
 
 # Job Glue
@@ -247,54 +287,4 @@ resource "aws_cloudwatch_log_group" "glue_log_group" {
 resource "aws_iam_role_policy_attachment" "glue_cloudwatch_logs" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSGlueServiceNotebookRole"
   role       = aws_iam_role.glue_exec_role.name
-}
-
-# Tabela Glue para dados de saída
-resource "aws_glue_catalog_table" "bovespa_output_table" {
-  database_name = aws_glue_catalog_database.bovespa_db.name
-  name          = "bovespa_output_table"
-  table_type    = "EXTERNAL_TABLE"
-
-  storage_descriptor {
-    location      = "s3://${aws_s3_bucket.bovespa_bucket.bucket}/refined/"
-    input_format  = "org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat"
-    output_format = "org.apache.hadoop.hive.ql.io.parquet.MapredParquetOutputFormat"
-    ser_de_info {
-      serialization_library = "org.apache.hadoop.hive.ql.io.parquet.serde.ParquetHiveSerDe"
-    }
-
-    columns {
-      name = "CodigoRenomeado"
-      type = "string"
-    }
-    columns {
-      name = "AcaoRenomeada"
-      type = "string"
-    }
-    columns {
-      name = "Qtde_Teorica_Total"
-      type = "double"
-    }
-    columns {
-      name = "Part_Perc_Total"
-      type = "double"
-    }
-    columns {
-      name = "date_partition"
-      type = "string"
-    }
-    columns {
-      name = "symbol"
-      type = "string"
-    }
-  }
-
-  partition_keys {
-    name = "date_partition"
-    type = "string"
-  }
-  partition_keys {
-    name = "symbol"
-    type = "string"
-  }
 }
